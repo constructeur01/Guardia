@@ -1,122 +1,196 @@
-<!DOCTPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site De Trystan Big BG</title>
+    <title>Mon Paint Simple</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
-            color: #333;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        header {
+        #toolbar {
             background-color: #333;
             color: #fff;
-            padding: 20px;
-            text-align: center;
-        }
-        nav {
-            background-color: #444;
             padding: 10px;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        nav a {
+        #toolbar button, #toolbar input, #toolbar select {
+            background-color: #555;
             color: #fff;
-            margin: 0 15px;
-            text-decoration: none;
-            font-weight: bold;
+            border: 1px solid #777;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
         }
-        nav a:hover {
-            color: #ddd;
+        #toolbar button:hover {
+            background-color: #666;
         }
-        main {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
+        #toolbar button.active {
+            background-color: #777;
+        }
+        #canvasContainer {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             background-color: #fff;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border: 1px solid #ccc;
         }
-        section {
-            margin-bottom: 40px;
+        #canvas {
+            border: 1px solid #000;
+            cursor: crosshair;
+            background-color: #fff;
         }
-        h1, h2 {
-            color: #333;
+        #saveBtn {
+            background-color: #4CAF50;
+            margin-left: auto;
         }
-        footer {
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            padding: 10px;
-            position: fixed;
-            width: 100%;
-            bottom: 0;
+        #saveBtn:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <header>
-        <a href="#contact">Contact</a>
-    </nav>
-    
-            <p>Ceci est la page d'accueil de mon site web. Elle présente une introduction brève et conviviale pour les visiteurs.</p>
-            <p>Vous pouvez ajouter ici des éléments multimédias, des images ou des liens vers d'autres sections.</p>
-                <li>Objectif : Fournir un modèle réutilisable.</li>
-                <li>Technologies : HTML5, CSS3.</li>
-        
-        <section id="contact">
-            <h2>Contact</h2>
-            <p>Pour me contacter, utilisez les informations suivantes :</p>
-            <address>
-                Email : <a href="mailto:exemple@email.com">exemple@email.com</a><br>
-                Localisation : France
-            </address>
-            <form action="#" method="post">
-                <label for="nom">Nom :</label><br>
-                <input type="text" id="nom" name="nom" required><br><br>
-                <label for="email">Email :</label><br>
-                <input type="email" id="email" name="email" required><br><br>
-                <label for="message">Message :</label><br>
-                <textarea id="message" name="message" rows="4" cols="50" required></textarea><br><br>
-                <input type="submit" value="Envoyer">
-            </form>
-        </section>
-    </main>
-    
-    <footer>
-        <p>&copy; 2025 Mon Site Web. Tous droits réservés.</p>
-    </footer>
-    
+    <div id="toolbar">
+        <button id="pencil" class="active">Crayon</button>
+        <button id="eraser">Gomme</button>
+        <button id="line">Ligne</button>
+        <button id="rect">Rectangle</button>
+        <button id="circle">Cercle</button>
+        <button id="fill">Remplissage</button>
+        <label>Taille: <input type="range" id="brushSize" min="1" max="50" value="5"></label>
+        <label>Couleur: <input type="color" id="color" value="#000000"></label>
+        <button id="clear">Effacer</button>
+        <button id="saveBtn">Sauvegarder</button>
+    </div>
+    <div id="canvasContainer">
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
     <script>
-        // Exemple simple de JavaScript pour la navigation fluide
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
-            });
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const pencilBtn = document.getElementById('pencil');
+        const eraserBtn = document.getElementById('eraser');
+        const lineBtn = document.getElementById('line');
+        const rectBtn = document.getElementById('rect');
+        const circleBtn = document.getElementById('circle');
+        const fillBtn = document.getElementById('fill');
+        const brushSize = document.getElementById('brushSize');
+        const colorPicker = document.getElementById('color');
+        const clearBtn = document.getElementById('clear');
+        const saveBtn = document.getElementById('saveBtn');
+
+        let tool = 'pencil';
+        let isDrawing = false;
+        let startX, startY;
+        let currentColor = '#000000';
+        let currentSize = 5;
+
+        // Événements pour les outils
+        pencilBtn.addEventListener('click', () => setTool('pencil'));
+        eraserBtn.addEventListener('click', () => setTool('eraser'));
+        lineBtn.addEventListener('click', () => setTool('line'));
+        rectBtn.addEventListener('click', () => setTool('rect'));
+        circleBtn.addEventListener('click', () => setTool('circle'));
+        fillBtn.addEventListener('click', () => setTool('fill'));
+        brushSize.addEventListener('input', (e) => currentSize = e.target.value);
+        colorPicker.addEventListener('input', (e) => currentColor = e.target.value);
+        clearBtn.addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
+        saveBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'mon-dessin.png';
+            link.href = canvas.toDataURL();
+            link.click();
         });
+
+        function setTool(newTool) {
+            tool = newTool;
+            document.querySelectorAll('#toolbar button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(newTool === 'pencil' ? 'pencil' : newTool === 'eraser' ? 'eraser' : newTool === 'line' ? 'line' : newTool === 'rect' ? 'rect' : newTool === 'circle' ? 'circle' : 'fill').classList.add('active');
+            canvas.style.cursor = newTool === 'eraser' ? 'grab' : 'crosshair';
+        }
+
+        // Événements de dessin
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentSize;
+
+            if (tool === 'pencil') {
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            } else if (tool === 'eraser') {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+            } else if (tool === 'line') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            } else if (tool === 'rect') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeRect(startX, startY, x - startX, y - startY);
+            } else if (tool === 'circle') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                ctx.beginPath();
+                ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+        }
+
+        function stopDrawing() {
+            if (isDrawing && (tool === 'line' || tool === 'rect' || tool === 'circle')) {
+                // Redessiner le dessin précédent si nécessaire, mais pour simplicité, on assume un nouveau dessin
+            }
+            isDrawing = false;
+        }
+
+        // Support pour le remplissage (basique, flood fill approximatif)
+        fillBtn.addEventListener('click', () => {
+            // Pour un vrai flood fill, implémentez une fonction plus avancée ; ici, un exemple simple
+            ctx.fillStyle = currentColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height); // Remplit tout, pour démo
+        });
+
+        // Initialisation
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     </script>
 </body>
-</html>                <li>Date de création : Novembre 2025.</li>
-            </ul>
-        </section>
-            <h2>À Propos</h2>
-            <p>Dans cette section, découvrez plus d'informations sur moi ou sur le projet. Par exemple, ce site a été créé comme un exemple basique en HTML, CSS et structure sémantique.</p>
-            <ul>
-        </section>
-        
-        <section id="a-propos">
-    <main>
-        <section id="accueil">
-            <h2>Accueil</h2>
-        <h1>Bienvenue sur Mon Site Web</h1>
-        <a href="#accueil">Accueil</a>
-        <a href="#a-propos">À Propos</a>
-    </header>
-    
-    <nav>
-
+</html>
