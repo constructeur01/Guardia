@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Paint Simple</title>
+    <title>Mon Paint Avancé</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,6 +13,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
         #toolbar {
             background-color: #333;
@@ -22,6 +23,7 @@
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
+            overflow-x: auto;
         }
         #toolbar button, #toolbar input, #toolbar select {
             background-color: #555;
@@ -37,18 +39,30 @@
         #toolbar button.active {
             background-color: #777;
         }
+        #colorPalette {
+            display: flex;
+            gap: 2px;
+        }
+        #colorPalette button {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+        }
         #canvasContainer {
             flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
             background-color: #fff;
-            border: 1px solid #ccc;
+            position: relative;
         }
         #canvas {
             border: 1px solid #000;
             cursor: crosshair;
             background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
         #saveBtn {
             background-color: #4CAF50;
@@ -57,67 +71,186 @@
         #saveBtn:hover {
             background-color: #45a049;
         }
+        #loadBtn {
+            background-color: #2196F3;
+        }
+        #loadBtn:hover {
+            background-color: #0b7dda;
+        }
+        #zoomSlider {
+            width: 100px;
+        }
+        #statusBar {
+            background-color: #ddd;
+            padding: 5px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        .tool-group {
+            display: flex;
+            gap: 5px;
+            border: 1px solid #777;
+            padding: 5px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="toolbar">
-        <button id="pencil" class="active">Crayon</button>
-        <button id="eraser">Gomme</button>
-        <button id="line">Ligne</button>
-        <button id="rect">Rectangle</button>
-        <button id="circle">Cercle</button>
-        <button id="fill">Remplissage</button>
-        <label>Taille: <input type="range" id="brushSize" min="1" max="50" value="5"></label>
-        <label>Couleur: <input type="color" id="color" value="#000000"></label>
+        <div class="tool-group">
+            <button id="pencil" class="active">Crayon</button>
+            <button id="brush">Pinceau</button>
+            <button id="eraser">Gomme</button>
+            <button id="eyedropper">Compte-gouttes</button>
+        </div>
+        <div class="tool-group">
+            <button id="line">Ligne</button>
+            <button id="rect">Rectangle</button>
+            <button id="ellipse">Ellipse</button>
+            <button id="polygon">Polygone</button>
+        </div>
+        <div class="tool-group">
+            <button id="text">Texte</button>
+            <button id="select">Sélection</button>
+            <button id="move">Déplacer</button>
+        </div>
+        <div class="tool-group">
+            <button id="fill">Remplissage</button>
+            <button id="crop">Recadrer</button>
+            <button id="grid">Grille</button>
+        </div>
+        <label>Taille: <input type="range" id="brushSize" min="1" max="100" value="5"></label>
+        <label>Opacité: <input type="range" id="opacity" min="0" max="1" step="0.1" value="1"></label>
+        <label>Couleur: 
+            <input type="color" id="color" value="#000000">
+            <div id="colorPalette"></div>
+        </label>
+        <label>Police: <select id="fontFamily">
+            <option>Arial</option>
+            <option>Times New Roman</option>
+            <option>Courier New</option>
+        </select></label>
+        <label>Taille texte: <input type="number" id="fontSize" min="8" max="72" value="16"></label>
+        <button id="undo">Annuler</button>
+        <button id="redo">Refaire</button>
         <button id="clear">Effacer</button>
+        <button id="zoomIn">Zoom +</button>
+        <button id="zoomOut">Zoom -</button>
+        <input type="range" id="zoomSlider" min="0.1" max="5" step="0.1" value="1">
+        <button id="loadBtn">Charger</button>
         <button id="saveBtn">Sauvegarder</button>
     </div>
     <div id="canvasContainer">
         <canvas id="canvas" width="800" height="600"></canvas>
     </div>
+    <div id="statusBar">Prêt. Coordonnées: (0, 0)</div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const toolbar = document.getElementById('toolbar');
+        const statusBar = document.getElementById('statusBar');
+
+        // Éléments DOM
         const pencilBtn = document.getElementById('pencil');
+        const brushBtn = document.getElementById('brush');
         const eraserBtn = document.getElementById('eraser');
+        const eyedropperBtn = document.getElementById('eyedropper');
         const lineBtn = document.getElementById('line');
         const rectBtn = document.getElementById('rect');
-        const circleBtn = document.getElementById('circle');
+        const ellipseBtn = document.getElementById('ellipse');
+        const polygonBtn = document.getElementById('polygon');
+        const textBtn = document.getElementById('text');
+        const selectBtn = document.getElementById('select');
+        const moveBtn = document.getElementById('move');
         const fillBtn = document.getElementById('fill');
+        const cropBtn = document.getElementById('crop');
+        const gridBtn = document.getElementById('grid');
         const brushSize = document.getElementById('brushSize');
+        const opacitySlider = document.getElementById('opacity');
         const colorPicker = document.getElementById('color');
+        const fontFamily = document.getElementById('fontFamily');
+        const fontSize = document.getElementById('fontSize');
+        const undoBtn = document.getElementById('undo');
+        const redoBtn = document.getElementById('redo');
         const clearBtn = document.getElementById('clear');
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const loadBtn = document.getElementById('loadBtn');
         const saveBtn = document.getElementById('saveBtn');
+        const colorPalette = document.getElementById('colorPalette');
 
+        // Variables d'état
         let tool = 'pencil';
         let isDrawing = false;
-        let startX, startY;
+        let startX, startY, currentX, currentY;
         let currentColor = '#000000';
         let currentSize = 5;
+        let currentOpacity = 1;
+        let currentFont = 'Arial';
+        let currentFontSize = 16;
+        let zoom = 1;
+        let gridVisible = false;
+        let history = [];
+        let historyIndex = -1;
+        let polygonPoints = [];
+        let textInput = null;
+        let isSelecting = false;
+        let selection = null;
 
-        // Événements pour les outils
+        // Palette de couleurs prédéfinies
+        const colors = ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080'];
+        colors.forEach(color => {
+            const btn = document.createElement('button');
+            btn.style.backgroundColor = color;
+            btn.addEventListener('click', () => colorPicker.value = color);
+            colorPalette.appendChild(btn);
+        });
+
+        // Événements des outils
         pencilBtn.addEventListener('click', () => setTool('pencil'));
+        brushBtn.addEventListener('click', () => setTool('brush'));
         eraserBtn.addEventListener('click', () => setTool('eraser'));
+        eyedropperBtn.addEventListener('click', () => setTool('eyedropper'));
         lineBtn.addEventListener('click', () => setTool('line'));
         rectBtn.addEventListener('click', () => setTool('rect'));
-        circleBtn.addEventListener('click', () => setTool('circle'));
+        ellipseBtn.addEventListener('click', () => setTool('ellipse'));
+        polygonBtn.addEventListener('click', () => setTool('polygon'));
+        textBtn.addEventListener('click', () => setTool('text'));
+        selectBtn.addEventListener('click', () => setTool('select'));
+        moveBtn.addEventListener('click', () => setTool('move'));
         fillBtn.addEventListener('click', () => setTool('fill'));
-        brushSize.addEventListener('input', (e) => currentSize = e.target.value);
+        cropBtn.addEventListener('click', () => setTool('crop'));
+        gridBtn.addEventListener('click', () => toggleGrid());
+        brushSize.addEventListener('input', (e) => currentSize = parseInt(e.target.value));
+        opacitySlider.addEventListener('input', (e) => currentOpacity = parseFloat(e.target.value));
         colorPicker.addEventListener('input', (e) => currentColor = e.target.value);
-        clearBtn.addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
-        saveBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'mon-dessin.png';
-            link.href = canvas.toDataURL();
-            link.click();
+        fontFamily.addEventListener('change', (e) => currentFont = e.target.value);
+        fontSize.addEventListener('input', (e) => currentFontSize = parseInt(e.target.value));
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+        clearBtn.addEventListener('click', clearCanvas);
+        zoomInBtn.addEventListener('click', () => zoomCanvas(0.1));
+        zoomOutBtn.addEventListener('click', () => zoomCanvas(-0.1));
+        zoomSlider.addEventListener('input', (e) => {
+            zoom = parseFloat(e.target.value);
+            canvas.style.transform = `scale(${zoom})`;
         });
+        loadBtn.addEventListener('click', loadImage);
+        saveBtn.addEventListener('click', saveImage);
 
         function setTool(newTool) {
             tool = newTool;
             document.querySelectorAll('#toolbar button').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(newTool === 'pencil' ? 'pencil' : newTool === 'eraser' ? 'eraser' : newTool === 'line' ? 'line' : newTool === 'rect' ? 'rect' : newTool === 'circle' ? 'circle' : 'fill').classList.add('active');
-            canvas.style.cursor = newTool === 'eraser' ? 'grab' : 'crosshair';
+            const toolBtn = document.getElementById(newTool);
+            if (toolBtn) toolBtn.classList.add('active');
+            updateCursor();
+            if (newTool === 'text') createTextInput();
+        }
+
+        function updateCursor() {
+            canvas.style.cursor = tool === 'eraser' ? 'grab' : tool === 'move' ? 'move' : tool === 'select' ? 'crosshair' : 'crosshair';
         }
 
         // Événements de dessin
@@ -129,68 +262,295 @@
         function startDrawing(e) {
             isDrawing = true;
             const rect = canvas.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
+            startX = (e.clientX - rect.left) / zoom;
+            startY = (e.clientY - rect.top) / zoom;
+            currentX = startX;
+            currentY = startY;
+            saveState();
+            if (tool === 'eyedropper') {
+                const pixel = ctx.getImageData(startX, startY, 1, 1).data;
+                currentColor = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+                colorPicker.value = currentColor;
+                return;
+            }
+            if (tool === 'fill') {
+                floodFill(startX, startY, currentColor, currentSize);
+                return;
+            }
+            if (tool === 'polygon') {
+                polygonPoints.push({x: startX, y: startY});
+                drawPolygon();
+                return;
+            }
+            if (tool === 'text') {
+                // Texte géré séparément
+                return;
+            }
             ctx.beginPath();
             ctx.moveTo(startX, startY);
+            updateStatus(startX, startY);
         }
 
         function draw(e) {
             if (!isDrawing) return;
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            currentX = (e.clientX - rect.left) / zoom;
+            currentY = (e.clientY - rect.top) / zoom;
+            updateStatus(currentX, currentY);
 
+            ctx.globalAlpha = currentOpacity;
+            ctx.strokeStyle = tool === 'eraser' ? '#FFFFFF' : currentColor;
+            ctx.lineWidth = currentSize;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = currentSize;
 
-            if (tool === 'pencil') {
-                ctx.lineTo(x, y);
+            if (tool === 'pencil' || tool === 'brush') {
+                ctx.lineTo(currentX, currentY);
                 ctx.stroke();
-            } else if (tool === 'eraser') {
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.stroke();
-                ctx.globalCompositeOperation = 'source-over';
+                if (tool === 'brush') {
+                    ctx.beginPath();
+                    ctx.arc(currentX, currentY, currentSize / 2, 0, 2 * Math.PI);
+                    ctx.fillStyle = currentColor;
+                    ctx.fill();
+                }
             } else if (tool === 'line') {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
+                redrawPreview(startX, startY, currentX, currentY, 'line');
             } else if (tool === 'rect') {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.strokeRect(startX, startY, x - startX, y - startY);
-            } else if (tool === 'circle') {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                ctx.beginPath();
-                ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
-                ctx.stroke();
+                redrawPreview(startX, startY, currentX, currentY, 'rect');
+            } else if (tool === 'ellipse') {
+                redrawPreview(startX, startY, currentX, currentY, 'ellipse');
+            } else if (tool === 'select' || tool === 'move') {
+                if (selection) {
+                    // Logique de sélection et déplacement simplifiée
+                    ctx.clearRect(selection.x, selection.y, selection.width, selection.height);
+                    selection.x = currentX - selection.offsetX;
+                    selection.y = currentY - selection.offsetY;
+                    ctx.drawImage(selection.canvas, selection.x, selection.y);
+                }
             }
         }
 
         function stopDrawing() {
-            if (isDrawing && (tool === 'line' || tool === 'rect' || tool === 'circle')) {
-                // Redessiner le dessin précédent si nécessaire, mais pour simplicité, on assume un nouveau dessin
+            if (isDrawing && (tool === 'line' || tool === 'rect' || tool === 'ellipse')) {
+                drawShape(tool, startX, startY, currentX, currentY);
             }
             isDrawing = false;
+            polygonPoints = [];
+            if (tool === 'polygon' && polygonPoints.length > 2) {
+                drawPolygon();
+            }
         }
 
-        // Support pour le remplissage (basique, flood fill approximatif)
-        fillBtn.addEventListener('click', () => {
-            // Pour un vrai flood fill, implémentez une fonction plus avancée ; ici, un exemple simple
-            ctx.fillStyle = currentColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height); // Remplit tout, pour démo
-        });
+        function redrawPreview(sx, sy, ex, ey, shape) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(history[history.length - 1].canvas, 0, 0);
+            ctx.beginPath();
+            if (shape === 'line') {
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(ex, ey);
+            } else if (shape === 'rect') {
+                ctx.strokeRect(sx, sy, ex - sx, ey - sy);
+            } else if (shape === 'ellipse') {
+                const radiusX = (ex - sx) / 2;
+                const radiusY = (ey - sy) / 2;
+                ctx.ellipse(sx + radiusX, sy + radiusY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            }
+            ctx.stroke();
+        }
+
+        function drawShape(shape, sx, sy, ex, ey) {
+            ctx.beginPath();
+            if (shape === 'line') {
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(ex, ey);
+            } else if (shape === 'rect') {
+                ctx.strokeRect(sx, sy, ex - sx, ey - sy);
+            } else if (shape === 'ellipse') {
+                const radiusX = Math.abs(ex - sx) / 2;
+                const radiusY = Math.abs(ey - sy) / 2;
+                ctx.ellipse(sx + radiusX, sy + radiusY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            }
+            ctx.stroke();
+            saveState();
+        }
+
+        function drawPolygon() {
+            if (polygonPoints.length < 3) return;
+            ctx.beginPath();
+            ctx.moveTo(polygonPoints[0].x, polygonPoints[0].y);
+            for (let i = 1; i < polygonPoints.length; i++) {
+                ctx.lineTo(polygonPoints[i].x, polygonPoints[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            saveState();
+        }
+
+        function createTextInput() {
+            if (textInput) textInput.remove();
+            textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.style.position = 'absolute';
+            textInput.style.left = '50%';
+            textInput.style.top = '50%';
+            textInput.style.transform = 'translate(-50%, -50%)';
+            textInput.style.zIndex = '1000';
+            textInput.placeholder = 'Entrez du texte...';
+            document.body.appendChild(textInput);
+            textInput.addEventListener('blur', () => {
+                if (textInput.value) {
+                    ctx.font = `${currentFontSize}px ${currentFont}`;
+                    ctx.fillStyle = currentColor;
+                    ctx.globalAlpha = currentOpacity;
+                    ctx.fillText(textInput.value, startX, startY);
+                    saveState();
+                }
+                textInput.remove();
+                textInput = null;
+            });
+            textInput.focus();
+        }
+
+        // Remplissage flood fill basique (algorithme récursif simplifié)
+        function floodFill(x, y, fillColor, tolerance = 0) {
+            const targetColor = getPixelColor(x, y);
+            if (colorsMatch(targetColor, hexToRgb(fillColor))) return;
+            const stack = [{x, y}];
+            while (stack.length) {
+                const {x: cx, y: cy} = stack.pop();
+                if (cx < 0 || cx >= canvas.width || cy < 0 || cy >= canvas.height) continue;
+                const currentColor = getPixelColor(cx, cy);
+                if (!colorsMatch(currentColor, targetColor, tolerance)) continue;
+                ctx.fillStyle = fillColor;
+                ctx.fillRect(cx, cy, 1, 1);
+                stack.push({x: cx + 1, y: cy});
+                stack.push({x: cx - 1, y: cy});
+                stack.push({x: cx, y: cy + 1});
+                stack.push({x: cx, y: cy - 1});
+            }
+            saveState();
+        }
+
+        function getPixelColor(x, y) {
+            const data = ctx.getImageData(x, y, 1, 1).data;
+            return {r: data[0], g: data[1], b: data[2], a: data[3]};
+        }
+
+        function colorsMatch(c1, c2, tolerance = 0) {
+            return Math.abs(c1.r - c2.r) < tolerance && Math.abs(c1.g - c2.g) < tolerance && Math.abs(c1.b - c2.b) < tolerance;
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function toggleGrid() {
+            gridVisible = !gridVisible;
+            drawGrid();
+        }
+
+        function drawGrid() {
+            if (!gridVisible) return;
+            ctx.save();
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 20) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function updateStatus(x, y) {
+            statusBar.textContent = `Outil: ${tool} | Coordonnées: (${Math.round(x)}, ${Math.round(y)}) | Zoom: ${zoom.toFixed(1)}x`;
+        }
+
+        // Historique
+        function saveState() {
+            history = history.slice(0, historyIndex + 1);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            history.push({canvas: document.createElement('canvas'), index: historyIndex + 1});
+            history[history.length - 1].canvas.width = canvas.width;
+            history[history.length - 1].canvas.height = canvas.height;
+            history[history.length - 1].canvas.getContext('2d').putImageData(imageData, 0, 0);
+            historyIndex++;
+        }
+
+        function undo() {
+            if (historyIndex <= 0) return;
+            historyIndex--;
+            const imageData = history[historyIndex].canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function redo() {
+            if (historyIndex >= history.length - 1) return;
+            historyIndex++;
+            const imageData = history[historyIndex].canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            saveState();
+        }
+
+        function zoomCanvas(delta) {
+            zoom += delta;
+            zoom = Math.max(0.1, Math.min(5, zoom));
+            zoomSlider.value = zoom;
+            canvas.style.transform = `scale(${zoom})`;
+        }
+
+        function loadImage() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        saveState();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            };
+            input.click();
+        }
+
+        function saveImage() {
+            const link = document.createElement('a');
+            link.download = 'mon-dessin-avance.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
 
         // Initialisation
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        saveState();
+        updateCursor();
+        drawGrid();
     </script>
 </body>
 </html>
